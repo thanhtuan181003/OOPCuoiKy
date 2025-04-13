@@ -1,0 +1,172 @@
+package OOP;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.sql.*;
+import java.text.DecimalFormat;
+
+public class GiangVienGUI extends JFrame {
+    private JTable table;
+    private DefaultTableModel tableModel;
+    private Connection connection;
+
+    public GiangVienGUI(Connection connection, String userId) {
+        this.connection = connection;
+
+        // Thiết lập JFrame
+        setTitle("Giảng viên");
+        setSize(800, 400);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        // Tạo bảng mà không có tiêu đề cột ban đầu
+        tableModel = new DefaultTableModel();
+        table = new JTable(tableModel);
+        JScrollPane scrollPane = new JScrollPane(table);
+        add(scrollPane, BorderLayout.CENTER);
+
+        // Tạo panel bên phải cho các nút chức năng
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+        rightPanel.setPreferredSize(new Dimension(200, getHeight()));
+
+        // Nút "Tìm kiếm"
+        JButton deleteButton = new JButton("Tìm Kiếm");
+        // Nút "Hiển thị danh sách giảng viên"
+        JButton displayListButton = new JButton("Hiển thị danh sách giảng viên");
+        // Nút "Quay lại"
+        JButton backButton = new JButton("Quay lại");
+
+        // Thêm các nút vào panel bên phải
+        rightPanel.add(deleteButton);
+        rightPanel.add(Box.createVerticalStrut(20));
+        rightPanel.add(displayListButton);
+        rightPanel.add(Box.createVerticalStrut(20));
+        rightPanel.add(backButton);
+
+        // Thêm panel bên phải vào giao diện
+        add(rightPanel, BorderLayout.EAST);
+
+        // Xử lý sự kiện cho nút "Tìm kiếm"
+        deleteButton.addActionListener(e -> showSearchDialog());
+
+        // Xử lý sự kiện cho nút "Hiển thị danh sách giảng viên"
+        displayListButton.addActionListener(e -> loadDataFromDatabase());
+
+        // Xử lý sự kiện cho nút "Quay lại"
+        backButton.addActionListener(e -> {
+            int option = JOptionPane.showConfirmDialog(
+                this,
+                "Bạn có chắc muốn quay lại không?",
+                "Xác nhận",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+            );
+
+            if (option == JOptionPane.YES_OPTION) {
+                resetTable();
+            }
+        });
+    }
+
+    private void resetTable() {
+        tableModel = new DefaultTableModel();
+        table.setModel(tableModel);
+    }
+
+    private void loadDataFromDatabase() {
+        DecimalFormat df = new DecimalFormat("#,###");
+        try {
+            String[] columnNames = {"ID", "Tiền lương", "Tên", "SĐT"};
+            tableModel = new DefaultTableModel(columnNames, 0);
+            table.setModel(tableModel);
+
+            table.getColumnModel().getColumn(0).setPreferredWidth(50);
+            table.getColumnModel().getColumn(1).setPreferredWidth(100);
+            table.getColumnModel().getColumn(2).setPreferredWidth(150);
+            table.getColumnModel().getColumn(3).setPreferredWidth(100);
+
+            String query = "SELECT g.ID, g.TIENLUONG, u.TEN, u.SDT " +
+                          "FROM GIANGVIEN g " +
+                          "LEFT JOIN USERS u ON g.ID = u.ID";
+            Statement stmt = connection.createStatement();
+            ResultSet rs = stmt.executeQuery(query);
+
+            while (rs.next()) {
+                String id = rs.getString("ID");
+                long tienluong = rs.getLong("TIENLUONG");
+                String ten = rs.getString("TEN");
+                String sdt = rs.getString("SDT");
+                String formattedTienluong = df.format(tienluong);
+                tableModel.addRow(new Object[]{id, formattedTienluong, ten, sdt});
+            }
+
+            rs.close();
+            stmt.close();
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Lỗi khi tải dữ liệu: " + e.getMessage());
+        }
+    }
+
+    private void showSearchDialog() {
+        String id = JOptionPane.showInputDialog(this, "Nhập ID:", "Tìm kiếm giảng viên", JOptionPane.PLAIN_MESSAGE);
+        if (id != null && !id.trim().isEmpty()) {
+            searchLecturerById(id.trim());
+        } else if (id != null && id.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Vui lòng nhập ID!");
+        }
+    }
+
+    private void searchLecturerById(String id) {
+        DecimalFormat df = new DecimalFormat("#,###");
+        try {
+            String[] columnNames = {"ID", "Tiền lương", "Tên", "SĐT"};
+            tableModel = new DefaultTableModel(columnNames, 0);
+            table.setModel(tableModel);
+
+            table.getColumnModel().getColumn(0).setPreferredWidth(50);
+            table.getColumnModel().getColumn(1).setPreferredWidth(100);
+            table.getColumnModel().getColumn(2).setPreferredWidth(150);
+            table.getColumnModel().getColumn(3).setPreferredWidth(100);
+
+            String query = "SELECT g.ID, g.TIENLUONG, u.TEN, u.SDT " +
+                          "FROM GIANGVIEN g " +
+                          "LEFT JOIN USERS u ON g.ID = u.ID " +
+                          "WHERE g.ID = ?";
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            pstmt.setString(1, id);
+
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                String lecturerId = rs.getString("ID");
+                long tienluong = rs.getLong("TIENLUONG");
+                String ten = rs.getString("TEN");
+                String sdt = rs.getString("SDT");
+                String formattedTienluong = df.format(tienluong);
+                tableModel.addRow(new Object[]{lecturerId, formattedTienluong, ten, sdt});
+            } else {
+                JOptionPane.showMessageDialog(this, "Không tìm thấy giảng viên với ID: " + id);
+            }
+
+            rs.close();
+            pstmt.close();
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Lỗi khi tìm kiếm: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void dispose() {
+        try {
+            if (connection != null && !connection.isClosed()) {
+                connection.close();
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Lỗi khi đóng kết nối: " + e.getMessage());
+        }
+        super.dispose();
+    }
+}
